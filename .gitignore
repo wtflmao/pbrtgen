@@ -9,3 +9,5 @@ node_modules
 exr_cache
 .idea
 .vscode
+
+__pycache__

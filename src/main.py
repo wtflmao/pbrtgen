@@ -3,15 +3,20 @@ from astropy.coordinates import ICRS, EarthLocation, GCRS
 from astropy.time import Time
 import astropy.units as u
 
+from .celestial_objects import load_ephemeris, get_celestial_object
+from .coordinates import skyfield_to_icrs, icrs_to_gcrs, convert_au_to_km
+from .time_utils import get_timescale, get_utc_time
+from .tle_data import load_tle_data, get_satellite
+
 # 1. 加载 JPL DE 星历数据
-eph = load('de440s.bsp') # from Year 1849 to Year 2150
-earth = eph['earth']
-sun = eph['sun']
-moon = eph['moon']
+eph = load_ephemeris() # from Year 1849 to Year 2150
+earth = get_celestial_object(eph, 'earth')
+sun = get_celestial_object(eph, 'sun')
+moon = get_celestial_object(eph, 'moon')
 
 # 2. 定义时间 (2025年3月10日 UTC+8 08:00)
-ts = load.timescale() # 获取 skyfield 的 timescale
-time_utc = ts.utc(2025, 3, 10, 8, 0, 0) # 使用 skyfield 的 timescale 创建 Time 对象
+ts = get_timescale() # 获取 skyfield 的 timescale
+time_utc = get_utc_time(ts, 2025, 3, 10, 8, 0, 0) # 使用 skyfield 的 timescale 创建 Time 对象
 
 # 3. 定义 Starlink 卫星的 TLE 数据 
 TLE1 = {'STARLINK-1008': '1 44714C 19074B   25068.82340278  .00023551  00000+0  15777-2 0   687',
@@ -37,89 +42,31 @@ satellite_32899_position = (earth + satellite_32899).at(time_utc).position
 
 # 6. 将 skyfield 的位置转换为 astropy 的 ICRS 坐标
 # 正确提取三维坐标分量并添加单位
-earth_icrs = ICRS(
-    x=earth_position.au[0] * u.au,
-    y=earth_position.au[1] * u.au,
-    z=earth_position.au[2] * u.au,
-    representation_type='cartesian'
-)
+earth_icrs = skyfield_to_icrs(earth_position)
+sun_icrs = skyfield_to_icrs(sun_position)
+moon_icrs = skyfield_to_icrs(moon_position)
+satellite_1008_icrs = skyfield_to_icrs(satellite_1008_position)
+satellite_32899_icrs = skyfield_to_icrs(satellite_32899_position)
 
-sun_icrs = ICRS(
-    x=sun_position.au[0] * u.au,
-    y=sun_position.au[1] * u.au,
-    z=sun_position.au[2] * u.au,
-    representation_type='cartesian'
-)
-
-moon_icrs = ICRS(
-    x=moon_position.au[0] * u.au,
-    y=moon_position.au[1] * u.au,
-    z=moon_position.au[2] * u.au,
-    representation_type='cartesian'
-)
-
-satellite_1008_icrs = ICRS(
-    x=satellite_1008_position.au[0] * u.au,
-    y=satellite_1008_position.au[1] * u.au,
-    z=satellite_1008_position.au[2] * u.au,
-    representation_type='cartesian'
-)
-
-satellite_32899_icrs = ICRS(
-    x=satellite_32899_position.au[0] * u.au,
-    y=satellite_32899_position.au[1] * u.au,
-    z=satellite_32899_position.au[2] * u.au,
-    representation_type='cartesian'
-)
-
-# 6. 将 skyfield 的位置转换为 astropy 的 ICRS 坐标 (单位 km)
+# 7. 将 skyfield 的位置转换为 astropy 的 ICRS 坐标 (单位 km)
 # 正确提取三维坐标分量并添加单位
 au_to_km = 149597870.7  # 1 au in km
 
-earth_icrs_km = ICRS(
-    x=earth_icrs.x.value * au_to_km * u.km,
-    y=earth_icrs.y.value * au_to_km * u.km,
-    z=earth_icrs.z.value * au_to_km * u.km,
-    representation_type='cartesian'
-)
-
-sun_icrs_km = ICRS(
-    x=sun_icrs.x.value * au_to_km * u.km,
-    y=sun_icrs.y.value * au_to_km * u.km,
-    z=sun_icrs.z.value * au_to_km * u.km,
-    representation_type='cartesian'
-)
-
-moon_icrs_km = ICRS(
-    x=moon_icrs.x.value * au_to_km * u.km,
-    y=moon_icrs.y.value * au_to_km * u.km,
-    z=moon_icrs.z.value * au_to_km * u.km,
-    representation_type='cartesian'
-)
-
-satellite_1008_icrs_km = ICRS(
-    x=satellite_1008_icrs.x.value * au_to_km * u.km,
-    y=satellite_1008_icrs.y.value * au_to_km * u.km,
-    z=satellite_1008_icrs.z.value * au_to_km * u.km,
-    representation_type='cartesian'
-)
-
-satellite_32899_icrs_km = ICRS(
-    x=satellite_32899_icrs.x.value * au_to_km * u.km,
-    y=satellite_32899_icrs.y.value * au_to_km * u.km,
-    z=satellite_32899_icrs.z.value * au_to_km * u.km,
-    representation_type='cartesian'
-)
+earth_icrs_km = convert_au_to_km(earth_icrs)
+sun_icrs_km = convert_au_to_km(sun_icrs)
+moon_icrs_km = convert_au_to_km(moon_icrs)
+satellite_1008_icrs_km = convert_au_to_km(satellite_1008_icrs)
+satellite_32899_icrs_km = convert_au_to_km(satellite_32899_icrs)
 
 
-# 7.1. 转换为 GCRS 坐标 (单位: 千米 km)
-earth_gcrs_km = earth_icrs_km.transform_to(GCRS(obstime=Time(time_utc.utc_iso()))).cartesian
-sun_gcrs_km = sun_icrs_km.transform_to(GCRS(obstime=Time(time_utc.utc_iso()))).cartesian
-moon_gcrs_km = moon_icrs_km.transform_to(GCRS(obstime=Time(time_utc.utc_iso()))).cartesian
-satellite_1008_gcrs_km = satellite_1008_icrs_km.transform_to(GCRS(obstime=Time(time_utc.utc_iso()))).cartesian
-satellite_32899_gcrs_km = satellite_32899_icrs_km.transform_to(GCRS(obstime=Time(time_utc.utc_iso()))).cartesian
+# 8. 转换为 GCRS 坐标 (单位: 千米 km)
+earth_gcrs_km = icrs_to_gcrs(earth_icrs_km, time_utc.utc_iso())
+sun_gcrs_km = icrs_to_gcrs(sun_icrs_km, time_utc.utc_iso())
+moon_gcrs_km = icrs_to_gcrs(moon_icrs_km, time_utc.utc_iso())
+satellite_1008_gcrs_km = icrs_to_gcrs(satellite_1008_icrs_km, time_utc.utc_iso())
+satellite_32899_gcrs_km = icrs_to_gcrs(satellite_32899_icrs_km, time_utc.utc_iso())
 
-# 7. 输出结果
+# 9. 输出结果
 print(f"Time: {time_utc.utc_iso()}")
 print("--------------------")
 print(f"Earth (ICRS, AU): X={earth_icrs.x:.6f}, Y={earth_icrs.y:.6f}, Z={earth_icrs.z:.6f}")
