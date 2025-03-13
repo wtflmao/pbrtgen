@@ -75,7 +75,7 @@ AttributeEnd # 月球属性块结束 (Moon attribute block ends)
 
 """
 
-ws_items = -10
+ws_items = -4
 
 from .rendering_settings import rendering_settings_checker
 
@@ -99,4 +99,66 @@ def set_bkg_light_source(filename=None, scale=1.0):
     ws_items += 1
     return [f'LightSource "infinite" "string filename" "${filename}"',
             f'            "float scale" [${scale}]']
+
+def set_attrubute_the_sun(pos, power, radius=None):
+    if radius is None:
+        radius = 695500.0 # km
+    global ws_items
+    ws_items += 1
+    return [f'# The sun',
+            f'AttributeBegin',
+            f'  Translate ${pos.x} ${pos.y} ${pos.z}',
+            f'  AreaLightSource "diffuse" "spectrum L" "stdillum-D65"', #  使用内置光谱 "stdillum-D65" 近似太阳光谱
+                                                                        #  注意: 真实的太阳光谱需要使用 spectrum.txt 文件，这里为了方便使用内置近似
+            f'                  "float power" [${power}]',              #  太阳光度，瓦特 (Solar luminosity in Watts)
+            f'                  "bool twosided false',                  #  单面发光 (One-sided emission)
+            f'  Shape "sphere" "float radius" ${radius}',
+            f'AttributeEnd']
+
+def set_attrubute_the_earth(pos, rot_angle=None, rot_axis=None, radius=None):
+    if radius is None:
+        radius = 6378.0 # km
+    if rot_angle is None and rot_axis is None:
+        rot_angle = 23.5
+        rot_axis = [1, 0, 0] # X-axis
+    if rot_angle is None and rot_axis is not None:
+        return []
+    if rot_angle is not None and rot_axis is None:
+        return []
+    global ws_items
+    ws_items += 1
+    return [f'# The earth',
+            f'AttributeBegin',
+            f'  Translate ${pos.x} ${pos.y} ${pos.z}',
+            f'  Rotate ${rot_angle} ${rot_axis[0]} ${rot_axis[1]} ${rot_axis[2]}',
+            f'  MakeNamedMaterial "earthMaterial"',
+            f'    "string type" "coateddiffuse',    #  使用涂层漫反射材质模拟地球表面 (Coated Diffuse material for Earth's surface simulation)
+            f'    "rgb reflectance" [0.1 0.2 0.3]', #  地球平均反照率近似值，蓝色调为主 (Approximate Earth albedo, bluish tone)
+            f'    "float roughness" 0.15',          #  适中粗糙度 (Moderate roughness)
+            f'    "float thickness" 0.001',         #  涂层厚度 (Coating thickness)
+            f'    "rgb albedo" [0.1 0.2 0.3]',      #  涂层下的漫反射层反照率 (Albedo of diffuse base layer under coating)
+            f'    "float g" 0.0',                   #  涂层内部散射各项异性参数 (Coating internal scattering asymmetry)
+            f'    "integer maxdepth" 5',            #  涂层内部最大散射反弹次数 (Max scattering bounces inside coating)
+            f'  NamedMaterial "earthMaterial"',     #  应用命名材质 (Apply named material)
+            f'  Shape "sphere" "float radius" ${radius}',
+            f'AttributeEnd']
+
+def set_attrubute_the_moon(pos, radius=None):
+    if radius is None:
+        radius = 1737.5 # km
+    global ws_items
+    ws_items += 1
+    return [f'# The earth',
+            f'AttributeBegin',
+            f'  Translate ${pos.x} ${pos.y} ${pos.z}',
+            f'  MakeNamedMaterial "moonMaterial"',
+            f'    "string type" "diffuse',
+            f'    "rgb reflectance" [0.5 0.5 0.5]', #  月球平均反照率近似值，灰色调 (Approximate Moon albedo, grayish tone)
+            f'  NamedMaterial "moonMaterial"',      #  应用命名材质 (Apply named material)
+            f'  Shape "sphere" "float radius" ${radius}',
+            f'AttributeEnd']
+
+
+
+
 

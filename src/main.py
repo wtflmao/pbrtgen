@@ -8,6 +8,7 @@ from .coordinates import skyfield_to_icrs, icrs_to_gcrs, convert_au_to_km
 from .time_utils import get_timescale, get_utc_time
 from .tle_data import load_tle_data, get_satellite
 from .file_write import *
+from .world_settings import *
 
 # 1. 加载 JPL DE 星历数据
 eph = load_ephemeris() # from Year 1849 to Year 2150
@@ -89,3 +90,5 @@ print(f"Sun (GCRS, km): X={sun_gcrs_km.x:.6f}, Y={sun_gcrs_km.y:.6f}, Z={sun_gcr
 print(f"Moon (GCRS, km): X={moon_gcrs_km.x:.6f}, Y={moon_gcrs_km.y:.6f}, Z={moon_gcrs_km.z:.6f}")
 print(f"Starlink-1008 (GCRS, km): X={satellite_1008_gcrs_km.x:.6f}, Y={satellite_1008_gcrs_km.y:.6f}, Z={satellite_1008_gcrs_km.z:.6f}")
 print(f"Starlink-32899 (GCRS, km): X={satellite_32899_gcrs_km.x:.6f}, Y={satellite_32899_gcrs_km.y:.6f}, Z={satellite_32899_gcrs_km.z:.6f}")
+
+# 8. 构建 .pbrt 文件

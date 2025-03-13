@@ -13,3 +13,4 @@ def write_lines_to_file_loop(filepath, string_list):
     with open(filepath, 'w') as f:
         for line in string_list:
             f.write(line + '\n')  # 在每行末尾添加换行符
+        f.write(line + '\n')  # 在最后一行末尾让它换两行
