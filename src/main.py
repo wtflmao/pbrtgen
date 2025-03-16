@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 from skyfield.api import load, Topos, EarthSatellite, wgs84
 from astropy.coordinates import ICRS, EarthLocation, GCRS
 from astropy.time import Time
@@ -8,6 +9,7 @@ from .coordinates import skyfield_to_icrs, icrs_to_gcrs, convert_au_to_km
 from .time_utils import get_timescale, get_utc_time
 from .tle_data import load_tle_data, get_satellite
 from .file_write import *
+from .rendering_settings import *
 from .world_settings import *
 
 # 1. 加载 JPL DE 星历数据
@@ -91,4 +93,20 @@ print(f"Moon (GCRS, km): X={moon_gcrs_km.x:.6f}, Y={moon_gcrs_km.y:.6f}, Z={moon
 print(f"Starlink-1008 (GCRS, km): X={satellite_1008_gcrs_km.x:.6f}, Y={satellite_1008_gcrs_km.y:.6f}, Z={satellite_1008_gcrs_km.z:.6f}")
 print(f"Starlink-32899 (GCRS, km): X={satellite_32899_gcrs_km.x:.6f}, Y={satellite_32899_gcrs_km.y:.6f}, Z={satellite_32899_gcrs_km.z:.6f}")
 
-# 8. 构建 .pbrt 文件
+# 10. 构建 .pbrt 文件
+
+r_settings = [['# PBRTgen 0.0.1', '# by github.com/wtflmao', '\n'],
+              set_lookat([30000, 30000, 30000], [0, 0, 0], None),
+              set_camera(None, 60.0),
+              set_sampler(None, None),
+              set_integrator(None, None),
+              set_film(1366, 768, None),
+              set_pixel_filter(),
+              set_color_space(None)]
+r_settings_overwriter('test.pbrt', r_settings)
+
+w_settiings = [set_bkg_light_source(None, 0.5),
+               set_attrubute_the_sun(sun_gcrs_km, 3.828e+26, None),
+               set_attrubute_the_moon(moon_gcrs_km, None),
+               set_attrubute_the_earth(earth_gcrs_km, None, None, None)]
+
