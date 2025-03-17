@@ -39,9 +39,9 @@ def set_lookat(cam_coord, to_coord=None, up_coord=None):
         up_coord = [0.0, 0.0, 1.0]
     global rs_items
     rs_items += 1
-    return [f'LookAt ${cam_coord[0]}  ${cam_coord[1]}  ${cam_coord[2]}',
-            f'       ${cam_coord[0]}  ${cam_coord[1]}  ${cam_coord[2]}',
-            f'       ${cam_coord[0]}  ${cam_coord[1]}  ${cam_coord[2]}']
+    return [f'LookAt {cam_coord[0]}  {cam_coord[1]}  {cam_coord[2]}',
+            f'       {to_coord[0]}  {to_coord[1]}  {to_coord[2]}',
+            f'       {up_coord[0]}  {up_coord[1]}  {up_coord[2]}']
 
 def set_camera(cam_type=None, fov=None):
     """设置相机参数。
@@ -59,7 +59,7 @@ def set_camera(cam_type=None, fov=None):
         fov = 60.0
     global rs_items
     rs_items += 1
-    return [f'Camera "${cam_type}" "float fov" ${fov}']
+    return [f'Camera "{cam_type}" "float fov" {fov}']
 
 def set_sampler(type=None, samples=None):
     """设置采样器参数。
@@ -77,7 +77,7 @@ def set_sampler(type=None, samples=None):
         samples = 64
     global rs_items
     rs_items += 1
-    return [f'Sampler "${type}" "integer pixelsamples" ${samples}']
+    return [f'Sampler "{type}" "integer pixelsamples" {samples}']
 
 def set_integrator(type=None, maxdepth=None):
     """设置积分器参数。
@@ -95,7 +95,7 @@ def set_integrator(type=None, maxdepth=None):
         maxdepth = 5
     global rs_items
     rs_items += 1
-    return [f'Integrator "${type}" "integer maxdepth" ${maxdepth}']
+    return [f'Integrator "{type}" "integer maxdepth" {maxdepth}']
 
 def set_film(x=None, y=None, diagonal=None):
     """设置胶片参数。
@@ -117,9 +117,9 @@ def set_film(x=None, y=None, diagonal=None):
     global rs_items
     rs_items += 1
     return [f'Film "spectral" "string filename" "1.exr"',
-            f'     "integer xresulution" [${x}]',
-            f'     "integer yresulution" [${y}]',
-            f'     "float diagonal" [${diagonal}]',]
+            f'     "integer xresulution" [{x}]',
+            f'     "integer yresulution" [{y}]',
+            f'     "float diagonal" [{diagonal}]',]
 
 def set_pixel_filter():
     """设置像素过滤器参数。
@@ -144,7 +144,7 @@ def set_color_space(space=None):
         space = 'rec2020'
     global rs_items
     rs_items += 1
-    return [f'ColorSpace "${space}"']
+    return []#[f'ColorSpace "{space}"']
 
 def rendering_settings_checker():
     """检查渲染设置是否已全部设置。
@@ -173,10 +173,10 @@ def r_settings_overwriter(path, list_of_lists):
         pass
     else:
         return []
-    from .file_write import overwrite_file, write_lines_to_file_loop
+    from .file_write import overwrite_file, write_line_to_file_loop_with_newline
     overwrite_file(path, "")
-    for item in list_of_lists:
-        for line in item:
-            write_lines_to_file_loop(path, line)
-        write_lines_to_file_loop(path, '\n')
+    for mylist in list_of_lists:
+        for line in mylist:
+            write_line_to_file_loop_with_newline(path, line)
+        write_line_to_file_loop_with_newline(path, '')
     print('r_settings write done')

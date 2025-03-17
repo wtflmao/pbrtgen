@@ -205,8 +205,8 @@ def set_bkg_light_source(filename=None, scale=1.0):
         return []
     global ws_items
     ws_items += 1
-    return [f'LightSource "infinite" "string filename" "${filename}"',
-            f'            "float scale" [${scale}]']
+    return [f'LightSource "infinite" "string filename" "{filename}"',
+            f'            "float scale" [{scale}]']
 
 def set_attrubute_the_sun(pos, power, radius=None):
     """设置太阳的属性。
@@ -227,12 +227,12 @@ def set_attrubute_the_sun(pos, power, radius=None):
     ws_items += 1
     return [f'# The sun',
             f'AttributeBegin',
-            f'  Translate ${pos.x} ${pos.y} ${pos.z}',
+            f'  Translate {pos.x} {pos.y} {pos.z}',
             f'  AreaLightSource "diffuse" "spectrum L" "stdillum-D65"', #  使用内置光谱 "stdillum-D65" 近似太阳光谱
                                                                         #  注意: 真实的太阳光谱需要使用 spectrum.txt 文件，这里为了方便使用内置近似
-            f'                  "float power" [${power}]',              #  太阳光度，瓦特 (Solar luminosity in Watts)
+            f'                  "float power" [{power}]',              #  太阳光度，瓦特 (Solar luminosity in Watts)
             f'                  "bool twosided false',                  #  单面发光 (One-sided emission)
-            f'  Shape "sphere" "float radius" ${radius}',
+            f'  Shape "sphere" "float radius" {radius}',
             f'AttributeEnd']
 
 def set_attrubute_the_earth(pos, rot_angle=None, rot_axis=None, radius=None):
@@ -262,8 +262,8 @@ def set_attrubute_the_earth(pos, rot_angle=None, rot_axis=None, radius=None):
     ws_items += 1
     return [f'# The earth',
             f'AttributeBegin',
-            f'  Translate ${pos.x} ${pos.y} ${pos.z}',
-            f'  Rotate ${rot_angle} ${rot_axis[0]} ${rot_axis[1]} ${rot_axis[2]}',
+            f'  Translate {pos.x} {pos.y} {pos.z}',
+            f'  Rotate {rot_angle} {rot_axis[0]} {rot_axis[1]} {rot_axis[2]}',
             f'  MakeNamedMaterial "earthMaterial"',
             f'    "string type" "coateddiffuse',    #  使用涂层漫反射材质模拟地球表面 (Coated Diffuse material for Earth's surface simulation)
             f'    "rgb reflectance" [0.1 0.2 0.3]', #  地球平均反照率近似值，蓝色调为主 (Approximate Earth albedo, bluish tone)
@@ -273,7 +273,7 @@ def set_attrubute_the_earth(pos, rot_angle=None, rot_axis=None, radius=None):
             f'    "float g" 0.0',                   #  涂层内部散射各项异性参数 (Coating internal scattering asymmetry)
             f'    "integer maxdepth" 5',            #  涂层内部最大散射反弹次数 (Max scattering bounces inside coating)
             f'  NamedMaterial "earthMaterial"',     #  应用命名材质 (Apply named material)
-            f'  Shape "sphere" "float radius" ${radius}',
+            f'  Shape "sphere" "float radius" {radius}',
             f'AttributeEnd']
 
 def set_attrubute_the_moon(pos, radius=None):
@@ -294,12 +294,12 @@ def set_attrubute_the_moon(pos, radius=None):
     ws_items += 1
     return [f'# The earth',
             f'AttributeBegin',
-            f'  Translate ${pos.x} ${pos.y} ${pos.z}',
+            f'  Translate {pos.x} {pos.y} {pos.z}',
             f'  MakeNamedMaterial "moonMaterial"',
-            f'    "string type" "diffuse',
+            f'    "string type" "diffuse"',
             f'    "rgb reflectance" [0.5 0.5 0.5]', #  月球平均反照率近似值，灰色调 (Approximate Moon albedo, grayish tone)
             f'  NamedMaterial "moonMaterial"',      #  应用命名材质 (Apply named material)
-            f'  Shape "sphere" "float radius" ${radius}',
+            f'  Shape "sphere" "float radius" {radius}',
             f'AttributeEnd']
 
 def w_settings_appender(path, list_of_lists):
@@ -325,5 +325,15 @@ def w_settings_appender(path, list_of_lists):
         write_lines_to_file_loop(path, '\n')
     print('w_settings write done')
 
-
+def define_new_coatedconductor(name, Kd, Ks, ur, vr, is_remaproughness=None):
+    if is_remaproughness is None:
+        is_remaproughness = False
+    return [f'MakeNamedMaterial  "{name}"',
+            f'  "string type" "coatedconductor"',
+            f'  "spectrum Kd" {Kd}', # e.g [0.5, 0.4, 0.6]
+            f'  "spectrum Ks" {Ks}',
+            f'  "float uroughness" {ur}',
+            f'  "float vroughness" {vr}',
+            f'  "bool remaproughness" "{str(is_remaproughness).lower()}"',
+            f'AttributeEnd']
 
