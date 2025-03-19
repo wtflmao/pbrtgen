@@ -117,8 +117,8 @@ def set_film(x=None, y=None, diagonal=None):
     global rs_items
     rs_items += 1
     return [f'Film "spectral" "string filename" "1.exr"',
-            f'     "integer xresulution" [{x}]',
-            f'     "integer yresulution" [{y}]',
+            f'     "integer xresolution" [{x}]',
+            f'     "integer yresolution" [{y}]',
             f'     "float diagonal" [{diagonal}]',]
 
 def set_pixel_filter():

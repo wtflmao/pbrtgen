@@ -1,0 +1,6 @@
+api:
+  API_BASE_URL: https://home.hhzm.win:3001/
+  API_KEY: 1234567890
+  API_VERSION: v1
+tle:
+  CELESTRAK_TLE_URL: https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle

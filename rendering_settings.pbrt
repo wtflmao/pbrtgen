@@ -1,0 +1,25 @@
+# PBRTgen 0.0.1
+# by github.com/wtflmao
+
+
+
+LookAt 30000  30000  30000
+       0  0  0
+       0.0  0.0  1.0
+
+Camera "perspective" "float fov" 60.0
+
+Sampler "halton" "integer pixelsamples" 64
+
+Integrator "volpath" "integer maxdepth" 5
+
+Film "spectral" "string filename" "1.exr"
+     "integer xresolution" [1366]
+     "integer yresolution" [768]
+     "float diagonal" [70.0]
+
+PixelFilter "gaussian" "float xradius" 1 "float yradius" 1
+
+
+WorldBegin
+
