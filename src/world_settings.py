@@ -208,12 +208,11 @@ def set_bkg_light_source(filename=None, scale=1.0):
     return [f'LightSource "infinite" "string filename" "{filename}"',
             f'            "float scale" [{scale}]']
 
-def set_attrubute_the_sun(pos, power, radius=None):
+def set_attrubute_the_sun(pos, radius=None):
     """设置太阳的属性。
 
     Args:
-        pos (object): 太阳的位置，包含 x, y, z 属性。
-        power (float): 太阳的功率。
+        pos (list or object): 太阳的位置，可以是包含 x, y, z 属性的对象或 [x, y, z] 坐标列表。
         radius (float, optional): 太阳的半径。默认为 695500.0 (km)。
 
     Returns:
@@ -225,13 +224,34 @@ def set_attrubute_the_sun(pos, power, radius=None):
         radius = 695500.0 # km
     global ws_items
     ws_items += 1
-    return [f'# The sun',
+    
+    # 处理坐标，支持列表和对象两种形式
+    if isinstance(pos, list):
+        x, y, z = pos
+    else:
+        # 假设pos是一个具有x, y, z属性的对象，并且这些属性可能有value成员
+        try:
+            x = pos.x.value if hasattr(pos.x, 'value') else pos.x
+            y = pos.y.value if hasattr(pos.y, 'value') else pos.y
+            z = pos.z.value if hasattr(pos.z, 'value') else pos.z
+        except AttributeError:
+            # 如果对象没有预期的属性，给出警告并返回空列表
+            print("警告: 无法从对象中提取坐标数据")
+            return []
+    
+    return [f'# The sun (emitter part)',
             f'AttributeBegin',
-            f'  Translate {pos.x} {pos.y} {pos.z}',
-            f'  AreaLightSource "diffuse" "spectrum L" "stdillum-D65"', #  使用内置光谱 "stdillum-D65" 近似太阳光谱
-                                                                        #  注意: 真实的太阳光谱需要使用 spectrum.txt 文件，这里为了方便使用内置近似
-            f'                  "float power" [{power}]',              #  太阳光度，瓦特 (Solar luminosity in Watts)
-            f'                  "bool twosided false',                  #  单面发光 (One-sided emission)
+            f'  CoordSysTransform "camera"',
+            f'  LightSource "distant"', #  使用内置 "distant" 远距平行光
+            f'              "point3 from" [0 0 0]',
+            f'              "point3 to" [{x} {y} {z}]',
+            f'              "spectrum L" "sun.spd"',
+            f'              "float scale" [1.0]',
+            f'AttributeEnd',
+            f'',
+            f'# The sun (geometry part)',
+            f'AttributeBegin',
+            f'  Translate {x} {y} {z}',
             f'  Shape "sphere" "float radius" {radius}',
             f'AttributeEnd']
 
@@ -239,7 +259,7 @@ def set_attrubute_the_earth(pos, rot_angle=None, rot_axis=None, radius=None):
     """设置地球的属性。
 
     Args:
-        pos (object): 地球的位置，包含 x, y, z 属性。
+        pos (list or object): 地球的位置，可以是包含 x, y, z 属性的对象或 [x, y, z] 坐标列表。
         rot_angle (float, optional): 地球自转轴倾斜角度。默认为 23.5 度。
         rot_axis (list, optional): 地球自转轴。默认为 [1, 0, 0] (X 轴)。
         radius (float, optional): 地球的半径。默认为 6378.0 (km)。
@@ -260,12 +280,27 @@ def set_attrubute_the_earth(pos, rot_angle=None, rot_axis=None, radius=None):
         return []
     global ws_items
     ws_items += 1
+    
+    # 处理坐标，支持列表和对象两种形式
+    if isinstance(pos, list):
+        x, y, z = pos
+    else:
+        # 假设pos是一个具有x, y, z属性的对象，并且这些属性可能有value成员
+        try:
+            x = pos.x.value if hasattr(pos.x, 'value') else pos.x
+            y = pos.y.value if hasattr(pos.y, 'value') else pos.y
+            z = pos.z.value if hasattr(pos.z, 'value') else pos.z
+        except AttributeError:
+            # 如果对象没有预期的属性，给出警告并返回空列表
+            print("警告: 无法从对象中提取坐标数据")
+            return []
+    
     return [f'# The earth',
             f'AttributeBegin',
-            f'  Translate {pos.x} {pos.y} {pos.z}',
+            f'  Translate {x} {y} {z}',
             f'  Rotate {rot_angle} {rot_axis[0]} {rot_axis[1]} {rot_axis[2]}',
             f'  MakeNamedMaterial "earthMaterial"',
-            f'    "string type" "coateddiffuse',    #  使用涂层漫反射材质模拟地球表面 (Coated Diffuse material for Earth's surface simulation)
+            f'    "string type" "coateddiffuse"',    #  使用涂层漫反射材质模拟地球表面 (Coated Diffuse material for Earth's surface simulation)
             f'    "rgb reflectance" [0.1 0.2 0.3]', #  地球平均反照率近似值，蓝色调为主 (Approximate Earth albedo, bluish tone)
             f'    "float roughness" 0.15',          #  适中粗糙度 (Moderate roughness)
             f'    "float thickness" 0.001',         #  涂层厚度 (Coating thickness)
@@ -280,7 +315,7 @@ def set_attrubute_the_moon(pos, radius=None):
     """设置月球的属性。
 
     Args:
-        pos (object): 月球的位置，包含 x, y, z 属性。
+        pos (list or object): 月球的位置，可以是包含 x, y, z 属性的对象或 [x, y, z] 坐标列表。
         radius (float, optional): 月球的半径。默认为 1737.5 (km)。
 
     Returns:
@@ -292,9 +327,24 @@ def set_attrubute_the_moon(pos, radius=None):
         radius = 1737.5 # km
     global ws_items
     ws_items += 1
-    return [f'# The earth',
+    
+    # 处理坐标，支持列表和对象两种形式
+    if isinstance(pos, list):
+        x, y, z = pos
+    else:
+        # 假设pos是一个具有x, y, z属性的对象，并且这些属性可能有value成员
+        try:
+            x = pos.x.value if hasattr(pos.x, 'value') else pos.x
+            y = pos.y.value if hasattr(pos.y, 'value') else pos.y
+            z = pos.z.value if hasattr(pos.z, 'value') else pos.z
+        except AttributeError:
+            # 如果对象没有预期的属性，给出警告并返回空列表
+            print("警告: 无法从对象中提取坐标数据")
+            return []
+    
+    return [f'# The moon',
             f'AttributeBegin',
-            f'  Translate {pos.x} {pos.y} {pos.z}',
+            f'  Translate {x} {y} {z}',
             f'  MakeNamedMaterial "moonMaterial"',
             f'    "string type" "diffuse"',
             f'    "rgb reflectance" [0.5 0.5 0.5]', #  月球平均反照率近似值，灰色调 (Approximate Moon albedo, grayish tone)
@@ -318,11 +368,11 @@ def w_settings_appender(path, list_of_lists):
         pass
     else:
         return []
-    from .file_write import write_lines_to_file_loop
+    from .file_write import write_line_to_file_loop_with_newline
     for item in list_of_lists:
         for line in item:
-            write_lines_to_file_loop(path, line)
-        write_lines_to_file_loop(path, '\n')
+            write_line_to_file_loop_with_newline(path, line)
+        write_line_to_file_loop_with_newline(path, '\n')
     print('w_settings write done')
 
 def define_new_coatedconductor(name, Kd, Ks, ur, vr, is_remaproughness=None):

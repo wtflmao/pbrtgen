@@ -13,14 +13,19 @@ import json
 from tkinter import messagebox
 import os
 from PIL import Image, ImageTk
+from settings import settings
 
 from .celestial_objects import load_ephemeris, get_celestial_object
 from .coordinates import skyfield_to_icrs, icrs_to_gcrs, convert_au_to_km
 from .time_utils import get_timescale, get_utc_time
-from .tle_data import load_tle_data, get_satellite
+from .tle_data import get_tle_data, load_tle_data, get_satellite
 from .file_write import *
 from .rendering_settings import *
 from .world_settings import *
+from .interactive_plot import visualize_in_new_thread
+import webbrowser
+import threading
+import subprocess
 
 # 1. 加载 JPL DE 星历数据
 eph = load_ephemeris() # from Year 1849 to Year 2150
@@ -122,48 +127,15 @@ r_settings = [['# PBRTgen 0.0.1', '# by github.com/wtflmao', '\n'],
               ['WorldBegin']]
 r_settings_overwriter('rendering_settings.pbrt', r_settings)
 
-w_settiings = [set_bkg_light_source(None, 0.5),
-               set_attrubute_the_sun(sun_gcrs_km, 3.828e+26, None),
-               set_attrubute_the_moon(moon_gcrs_km, None),
-               set_attrubute_the_earth(earth_gcrs_km, None, None, None)]
+# 以下世界设置会在用户选择时间后更新，并在处理模型变换时应用
+w_settings = [] # 初始化为空列表，稍后填充
 
-# 从settings.yaml读取Celestrak TLE源地址
-def process_celestrak_tle_data():
-    """从Celestrak下载并处理最新的活跃卫星TLE数据
-    
-    Returns:
-        dict: 处理后的TLE数据字典 {卫星名: [tle1_line, tle2_line]}
-    """
-    # 读取 Celestrak TLE 源地址
-    with open('settings.yaml', 'r') as file:
-        settings = yaml.safe_load(file)
-    url = settings['tle']['CELESTRAK_TLE_URL']
-    
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        
-        # 解析TLE数据
-        tle_lines = response.text.strip().split('\n')
-        tle_data = {}
-        
-        # TLE数据是按三行一组排列的：卫星名、TLE行1、TLE行2
-        for i in range(0, len(tle_lines), 3):
-            if i+2 < len(tle_lines):
-                satellite_name = tle_lines[i].strip()
-                tle_line1 = tle_lines[i+1].strip()
-                tle_line2 = tle_lines[i+2].strip()
-                tle_data[satellite_name] = [tle_line1, tle_line2]
-        
-        print(f"成功下载了 {len(tle_data)} 个卫星的TLE数据")
-        return tle_data
-    except requests.exceptions.RequestException as e:
-        print(f"下载TLE数据失败: {e}")
-        # 如果下载失败，使用默认的TLE数据
-        return TLE
+# 从配置文件获取TLE下载地址
 
-# 下载最新的TLE数据
-latest_tle_data = process_celestrak_tle_data()
+# 获取TLE数据，使用缓存机制
+latest_tle_data = get_tle_data(settings.get('tle', {}).get('CELESTRAK_TLE_URL'))
+# 加载TLE数据
+latest_tle_data = load_tle_data(latest_tle_data)
 
 # 11. 构建 .pbrt 文件的卫星设置
 
@@ -224,11 +196,11 @@ class ModelTLESelector:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # 顶部时间选择器
-        time_frame = ttk.LabelFrame(main_frame, text="时间选择")
+        time_frame = ttk.LabelFrame(main_frame, text="UTC时间选择")
         time_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        # 使用当前时间作为默认值
-        now = dt.now()
+        # 使用当前UTC时间作为默认值
+        now = dt.now(datetime.timezone.utc)
         
         time_selector_frame = ttk.Frame(time_frame)
         time_selector_frame.pack(padx=5, pady=5)
@@ -258,6 +230,10 @@ class ModelTLESelector:
         ttk.Label(time_selector_frame, text="秒:").grid(row=0, column=10)
         self.second_var = tk.StringVar(value=now.second)
         ttk.Spinbox(time_selector_frame, from_=0, to=59, textvariable=self.second_var, width=3).grid(row=0, column=11)
+        
+        # 添加UTC时间说明
+        utc_note = ttk.Label(time_selector_frame, text="(所有时间均为UTC时间，而非本地时间)", foreground="red")
+        utc_note.grid(row=1, column=0, columnspan=12, pady=(5,0))
         
         # 选择区域（分为左右两栏）
         selection_frame = ttk.Frame(main_frame)
@@ -546,7 +522,7 @@ def select_models_and_tles():
     if hasattr(selector, 'result'):
         print("选择结果:")
         selected_time = selector.result['time']
-        print(f"选择的时间: {selected_time}")
+        print(f"选择的UTC时间: {selected_time}")
         
         print("模型-TLE配对:")
         for model_name, tle_name, model_uuid in selector.result['pairs']:
@@ -628,6 +604,35 @@ def transform_and_create_scene_files(selection_result, api_base_url, api_version
                          selected_time.minute, 
                          selected_time.second)
     
+    print(f"使用UTC时间: {time_utc.utc_iso()} 计算天体位置")
+    
+    # 使用用户选择的时间计算天体位置
+    # 计算天体在地心系中的位置 (地心坐标)
+    earth_position = earth.at(time_utc).position
+    sun_position = sun.at(time_utc).position
+    moon_position = moon.at(time_utc).position
+    
+    # 将 skyfield 的位置转换为 astropy 的 ICRS 坐标
+    earth_icrs = skyfield_to_icrs(earth_position)
+    sun_icrs = skyfield_to_icrs(sun_position)
+    moon_icrs = skyfield_to_icrs(moon_position)
+    
+    # 转换为 km 单位
+    earth_icrs_km = convert_au_to_km(earth_icrs)
+    sun_icrs_km = convert_au_to_km(sun_icrs)
+    moon_icrs_km = convert_au_to_km(moon_icrs)
+    
+    # 转换为 GCRS 坐标 (单位: 千米 km)
+    earth_gcrs_km = icrs_to_gcrs(earth_icrs_km, time_utc.utc_iso())
+    sun_gcrs_km = icrs_to_gcrs(sun_icrs_km, time_utc.utc_iso())
+    moon_gcrs_km = icrs_to_gcrs(moon_icrs_km, time_utc.utc_iso())
+    
+    # 基于用户选择的时间更新世界设置
+    w_settings = [set_bkg_light_source(None, 0.5),
+                 set_attrubute_the_sun([sun_gcrs_km.x.value, sun_gcrs_km.y.value, sun_gcrs_km.z.value], None),
+                 set_attrubute_the_moon([moon_gcrs_km.x.value, moon_gcrs_km.y.value, moon_gcrs_km.z.value], None),
+                 set_attrubute_the_earth([earth_gcrs_km.x.value, earth_gcrs_km.y.value, earth_gcrs_km.z.value], None, None, None)]
+    
     # 确保渲染设置文件存在
     if not os.path.exists('rendering_settings.pbrt'):
         print("渲染设置文件不存在，重新生成")
@@ -656,8 +661,16 @@ def transform_and_create_scene_files(selection_result, api_base_url, api_version
         os.remove(output_file_path)
     
     # 先写入公共头部
-    with open(output_file_path, 'w') as f:
+    with open(output_file_path, 'w', encoding='utf-8') as f:
         f.write(rendering_settings_content)
+        # 添加天体设置
+        f.write("\n# 天体设置\n\n")
+    
+    # 应用世界设置（天体）
+    w_settings_appender(output_file_path, w_settings)
+    
+    # 添加模型标记
+    with open(output_file_path, 'a') as f:
         f.write("\n# 模型部分开始\n\n")
     
     # 处理每个模型-TLE配对
@@ -788,6 +801,10 @@ def render_pbrt_file(api_base_url, api_version, api_key, pbrt_file_path):
                 result_file.write(response.content)
             
             print(f"渲染成功，结果保存为 {result_file_path}")
+            
+            # 自动打开EXR文件
+            open_exr_file(result_file_path)
+            
             return result_file_path
             
         except requests.exceptions.RequestException as e:
@@ -796,6 +813,32 @@ def render_pbrt_file(api_base_url, api_version, api_key, pbrt_file_path):
                 print(f"状态码: {e.response.status_code}")
                 print(f"错误信息: {e.response.text}")
             return None
+
+# 自动打开EXR文件
+def open_exr_file(exr_path):
+    """尝试打开EXR文件
+    
+    Args:
+        exr_path: EXR文件路径
+    """
+    try:
+        # 获取绝对路径
+        abs_path = os.path.abspath(exr_path)
+        
+        # 在Windows上尝试使用默认关联程序打开
+        if os.name == 'nt':
+            os.startfile(abs_path)
+        # 在macOS上使用open命令
+        elif os.name == 'posix' and 'darwin' in os.sys.platform:
+            subprocess.call(['open', abs_path])
+        # 在Linux上使用xdg-open
+        elif os.name == 'posix':
+            subprocess.call(['xdg-open', abs_path])
+        
+        print(f"已尝试打开EXR文件: {abs_path}")
+    except Exception as e:
+        print(f"无法自动打开EXR文件: {e}")
+        print(f"请手动打开文件: {exr_path}")
 
 # 在transform_and_create_scene_files函数末尾添加文件后处理步骤
 def post_process_pbrt_file(output_file_path):
@@ -834,11 +877,53 @@ if selection_result:
     
     # 如果成功生成场景文件，则提交渲染
     if pbrt_file_path:
+        # 准备卫星位置数据字典
+        satellite_positions = {}
+        for model_name, sat_name, model_uuid in selection_result['pairs']:
+            # 获取并创建卫星对象
+            satellite = EarthSatellite(latest_tle_data[sat_name][0], latest_tle_data[sat_name][1], sat_name, ts)
+            
+            # 计算卫星位置
+            satellite_position = (earth + satellite).at(time_utc).position
+            sat_icrs = skyfield_to_icrs(satellite_position)
+            sat_icrs_km = convert_au_to_km(sat_icrs)
+            sat_gcrs_km = icrs_to_gcrs(sat_icrs_km, time_utc.utc_iso())
+            
+            # 存储卫星位置
+            satellite_positions[sat_name] = [
+                float(sat_gcrs_km.x.value), 
+                float(sat_gcrs_km.y.value), 
+                float(sat_gcrs_km.z.value)
+            ]
+        
+        # 启动可视化线程
+        visualization_done = visualize_in_new_thread(
+            selection_result,
+            selection_result['time'],
+            satellite_positions,
+            latest_tle_data,  # 传递TLE数据
+            ts,  # 传递时间尺度对象
+            earth  # 传递地球对象
+        )
+        
+        # 提交渲染
         exr_file_path = render_pbrt_file(api_base_url, api_version, api_key, pbrt_file_path)
         if exr_file_path:
             print(f"渲染流程完成，结果文件: {exr_file_path}")
         else:
             print("渲染失败")
+            
+        # 等待可视化完成（最多等待30秒）
+        print("正在等待轨道可视化完成...")
+        visualization_done.wait(timeout=30)
+        if visualization_done.is_set():
+            print("轨道可视化已完成，程序将退出")
+        else:
+            print("轨道可视化可能仍在进行中，但程序将退出")
+        
+        # 暂停几秒确保用户看到最后的输出
+        import time
+        time.sleep(3)
     else:
         print("场景文件生成失败，无法渲染")
 
