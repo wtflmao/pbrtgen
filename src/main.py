@@ -22,10 +22,14 @@ from .tle_data import get_tle_data, load_tle_data, get_satellite
 from .file_write import *
 from .rendering_settings import *
 from .world_settings import *
-from .interactive_plot import visualize_in_new_thread
+from src.interactive_plot import visualize_in_new_thread
+from src.camera_viewpoint import select_camera_viewpoint
+from src.rendering_settings_view import get_rendering_settings
 import webbrowser
 import threading
 import subprocess
+import gc
+import time
 
 # 1. 加载 JPL DE 星历数据
 eph = load_ephemeris() # from Year 1849 to Year 2150
@@ -627,26 +631,147 @@ def transform_and_create_scene_files(selection_result, api_base_url, api_version
     sun_gcrs_km = icrs_to_gcrs(sun_icrs_km, time_utc.utc_iso())
     moon_gcrs_km = icrs_to_gcrs(moon_icrs_km, time_utc.utc_iso())
     
+    # 准备卫星位置数据，用于相机和观察点选择
+    satellite_positions = {}
+    
+    # 处理每个卫星的位置
+    for model_name, tle_name, model_uuid in selection_result['pairs']:
+        print(f"计算卫星 {tle_name} 的位置...")
+        
+        # 创建卫星对象
+        satellite = EarthSatellite(latest_tle_data[tle_name][0], latest_tle_data[tle_name][1], tle_name, ts)
+        
+        # 计算卫星位置
+        satellite_position = (earth + satellite).at(time_utc).position
+        
+        # 转换为ICRS坐标
+        satellite_icrs = skyfield_to_icrs(satellite_position)
+        satellite_icrs_km = convert_au_to_km(satellite_icrs)
+        
+        # 转换为GCRS坐标
+        satellite_gcrs_km = icrs_to_gcrs(satellite_icrs_km, time_utc.utc_iso())
+        
+        # 存储卫星位置
+        satellite_positions[tle_name] = [
+            float(satellite_gcrs_km.x.value), 
+            float(satellite_gcrs_km.y.value), 
+            float(satellite_gcrs_km.z.value)
+        ]
+        
+        # 打印卫星位置信息
+        print(f"卫星 {tle_name} GCRS坐标 (km): X={satellite_gcrs_km.x:.6f}, Y={satellite_gcrs_km.y:.6f}, Z={satellite_gcrs_km.z:.6f}")
+    
+    # 启动相机和观察点选择界面
+    print("正在启动相机位置和观察点选择界面...")
+    camera_viewpoint_result = select_camera_viewpoint(satellite_positions, selected_time, earth, ts)
+    
+    if not camera_viewpoint_result:
+        print("用户取消了相机和观察点选择，使用默认值")
+        # 默认相机位置和观察点 (默认相机位置在30000,30000,30000，观察点在地球中心)
+        camera_position = [30000, 30000, 30000]
+        target_position = [0, 0, 0]
+    else:
+        print("用户已选择相机位置和观察点")
+        camera_position = camera_viewpoint_result["camera"]["gcrs_coords"]
+        target_position = camera_viewpoint_result["target"]["gcrs_coords"]
+        print(f"相机位置: X={camera_position[0]:.2f}, Y={camera_position[1]:.2f}, Z={camera_position[2]:.2f}")
+        print(f"观察点: X={target_position[0]:.2f}, Y={target_position[1]:.2f}, Z={target_position[2]:.2f}")
+    
+    # 启动渲染设置界面
+    print("正在启动渲染设置界面...")
+    # 不要在这里清理tkinter资源，这会导致新窗口无法正常显示
+    rendering_settings_result = get_rendering_settings()
+    
+    if not rendering_settings_result:
+        print("用户取消了渲染设置，使用默认值")
+        # 默认渲染设置
+        fov = 60.0
+        resolution_x = 1366
+        resolution_y = 768
+        pixel_samples = 64
+        max_depth = 5
+    else:
+        print("用户已选择渲染设置")
+        fov = rendering_settings_result["fov"]
+        resolution_x = rendering_settings_result["resolution_x"]
+        resolution_y = rendering_settings_result["resolution_y"]
+        pixel_samples = rendering_settings_result["pixel_samples"]
+        max_depth = rendering_settings_result["max_depth"]
+        print(f"视场角: {fov} 度")
+        print(f"分辨率: {resolution_x} x {resolution_y} 像素")
+        print(f"像素采样次数: {pixel_samples}")
+        print(f"最大反射次数: {max_depth}")
+    
     # 基于用户选择的时间更新世界设置
     w_settings = [set_bkg_light_source(None, 0.5),
                  set_attrubute_the_sun([sun_gcrs_km.x.value, sun_gcrs_km.y.value, sun_gcrs_km.z.value], None),
                  set_attrubute_the_moon([moon_gcrs_km.x.value, moon_gcrs_km.y.value, moon_gcrs_km.z.value], None),
                  set_attrubute_the_earth([earth_gcrs_km.x.value, earth_gcrs_km.y.value, earth_gcrs_km.z.value], None, None, None)]
-    
+
     # 确保渲染设置文件存在
     if not os.path.exists('rendering_settings.pbrt'):
         print("渲染设置文件不存在，重新生成")
         r_settings = [['# PBRTgen 0.0.1', '# by github.com/wtflmao', '\n'],
-                      set_lookat([30000, 30000, 30000], [0, 0, 0], None),
-                      set_camera(None, 60.0),
-                      set_sampler(None, None),
-                      set_integrator(None, None),
-                      set_film(1366, 768, None),
+                      set_lookat(camera_position, target_position, None),
+                      set_camera(None, fov),
+                      set_sampler(None, pixel_samples),
+                      set_integrator(None, max_depth),
+                      set_film(resolution_x, resolution_y, None),
                       set_pixel_filter(),
                       set_color_space(None),
                       ['WorldBegin']]
         r_settings_overwriter('rendering_settings.pbrt', r_settings)
-    
+    else:
+        # 读取现有设置文件并更新相关部分
+        with open('rendering_settings.pbrt', 'r') as f:
+            content = f.read()
+        
+        # 查找并替换相机设置
+        lines = content.split('\n')
+        new_lines = []
+        i = 0
+        
+        while i < len(lines):
+            if lines[i].startswith('LookAt'):
+                # 跳过原有的3行LookAt设置
+                i += 3
+                # 添加新的LookAt设置
+                new_lines.append(f'LookAt {camera_position[0]}  {camera_position[1]}  {camera_position[2]}')
+                new_lines.append(f'       {target_position[0]}  {target_position[1]}  {target_position[2]}')
+                new_lines.append('       0  0  1')
+            elif lines[i].startswith('Camera '):
+                # 替换相机设置
+                new_lines.append(f'Camera "perspective" "float fov" {fov}')
+                i += 1
+            elif lines[i].startswith('Sampler '):
+                # 替换采样器设置
+                new_lines.append(f'Sampler "halton" "integer pixelsamples" {pixel_samples}')
+                i += 1
+            elif lines[i].startswith('Integrator '):
+                # 替换积分器设置
+                new_lines.append(f'Integrator "volpath" "integer maxdepth" {max_depth}')
+                i += 1
+            elif lines[i].startswith('Film '):
+                # 替换电影设置（可能跨多行）
+                new_lines.append('Film "spectral" "string filename" "1.exr"')
+                new_lines.append(f'     "integer xresolution" [{resolution_x}]')
+                new_lines.append(f'     "integer yresolution" [{resolution_y}]')
+                new_lines.append('     "float diagonal" [70]')
+                
+                # 跳过原有的Film行
+                while i < len(lines) and not (lines[i].startswith('PixelFilter') or lines[i].startswith('ColorSpace') or lines[i].startswith('WorldBegin')):
+                    i += 1
+                continue
+            else:
+                new_lines.append(lines[i])
+                i += 1
+        
+        # 重写文件
+        with open('rendering_settings.pbrt', 'w') as f:
+            f.write('\n'.join(new_lines))
+        
+        print("已更新渲染设置文件")
+
     # 读取渲染设置文件
     with open('rendering_settings.pbrt', 'r', encoding='utf-8') as f:
         rendering_settings_content = f.read()
@@ -864,6 +989,54 @@ def post_process_pbrt_file(output_file_path):
     except Exception as e:
         print(f"处理文件 {output_file_path} 时发生错误: {e}")
 
+def cleanup_tk_resources():
+    """清理Tkinter资源，确保在后续线程中不会出现tkinter问题"""
+    try:
+        # 在主线程中关闭所有可能打开的Tkinter窗口和变量
+        # 这是为了避免在新线程中使用Tkinter变量时出现线程错误
+        import tkinter as tk
+        import sys
+        import gc
+        
+        # 检查是否存在_tkinter模块，并且有active的tcl解释器
+        if '_tkinter' in sys.modules:
+            # 尝试销毁所有toplevel窗口
+            if hasattr(tk, '_default_root') and tk._default_root:
+                for widget in tk._default_root.winfo_children():
+                    if isinstance(widget, tk.Toplevel):
+                        try:
+                            widget.destroy()
+                        except Exception:
+                            pass
+                
+                # 获取所有Tk实例并销毁它们
+                for obj in list(tk._default_root._tclCommands) if hasattr(tk._default_root, '_tclCommands') else []:
+                    try:
+                        if hasattr(tk._default_root, 'eval'):
+                            tk._default_root.eval(f'rename {obj} ""')
+                    except Exception:
+                        pass
+                
+                # 销毁主窗口
+                try:
+                    tk._default_root.destroy()
+                except Exception:
+                    pass
+                
+                # 清空_default_root引用
+                tk._default_root = None
+        
+        # 执行两次垃圾回收，确保所有循环引用被清理
+        gc.collect()
+        gc.collect()
+        
+        print("已清理Tkinter资源")
+    except Exception as e:
+        print(f"清理Tkinter资源时出现错误 (忽略): {str(e)}")
+        
+    # 强制等待一小段时间，确保Tk资源完全释放
+    time.sleep(0.5)
+
 # 在渲染前调用后处理函数
 if selection_result:
     # 读取API设置
@@ -896,7 +1069,11 @@ if selection_result:
                 float(sat_gcrs_km.z.value)
             ]
         
-        # 启动可视化线程
+        # 提交渲染之前，先清理所有Tkinter资源
+        cleanup_tk_resources()
+        
+        # 启动可视化线程，确保Tkinter资源已完全清理
+        print("正在生成轨道可视化...")
         visualization_done = visualize_in_new_thread(
             selection_result,
             selection_result['time'],
@@ -906,24 +1083,22 @@ if selection_result:
             earth  # 传递地球对象
         )
         
-        # 提交渲染
+        # 提交渲染 - 这是一个阻塞操作，让它在可视化生成的同时进行
+        print("正在提交渲染请求...")
         exr_file_path = render_pbrt_file(api_base_url, api_version, api_key, pbrt_file_path)
+        
+        # 检查渲染结果
         if exr_file_path:
             print(f"渲染流程完成，结果文件: {exr_file_path}")
         else:
             print("渲染失败")
-            
-        # 等待可视化完成（最多等待30秒）
-        print("正在等待轨道可视化完成...")
-        visualization_done.wait(timeout=30)
-        if visualization_done.is_set():
-            print("轨道可视化已完成，程序将退出")
-        else:
-            print("轨道可视化可能仍在进行中，但程序将退出")
         
-        # 暂停几秒确保用户看到最后的输出
-        import time
-        time.sleep(3)
+        # 如果可视化尚未完成，等待一段时间
+        if not visualization_done.is_set():
+            print("正在等待轨道可视化完成...")
+            visualization_done.wait(30)  # 最多等待30秒
+            
+        print("流程完成。")
     else:
         print("场景文件生成失败，无法渲染")
 

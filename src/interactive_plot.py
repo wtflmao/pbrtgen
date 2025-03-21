@@ -9,20 +9,22 @@ import numpy as np
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from skyfield.api import load, EarthSatellite
 import webbrowser
 import os
 import threading
 import traceback
 import time
-from skyfield.api import load, EarthSatellite
+import math
+import csv
+import gc
 from astropy.coordinates import ICRS, GCRS, CartesianRepresentation
 from astropy.time import Time
 import astropy.units as u
-import math  # 添加数学库
-import csv
 
 class SolarSystemVisualizer:
-    def __init__(self, selected_satellites, time_utc, satellite_tle_data, ts, earth):
+    def __init__(self, selected_satellites, time_utc, satellite_tle_data, ts, earth, 
+                 camera_info=None, target_info=None):
         """初始化可视化器
         
         Args:
@@ -31,6 +33,8 @@ class SolarSystemVisualizer:
             satellite_tle_data (dict): TLE数据字典，格式为 {卫星名: [tle1_line, tle2_line]}
             ts: 时间尺度对象
             earth: 地球天体对象，用于计算轨道
+            camera_info (dict, optional): 相机信息，包含类型和名称
+            target_info (dict, optional): 目标点信息，包含类型和名称
         """
         self.selected_satellites = selected_satellites
         self.time_utc = time_utc
@@ -43,7 +47,29 @@ class SolarSystemVisualizer:
         
         # 默认轨道绘制设置 - 将在计算时动态调整
         self.default_orbit_points = 40  # 默认轨道点数量
-        self.default_orbit_hours = 1.5  # 默认轨道绘制时长 (小时)
+        self.default_orbit_hours = 1.5  # 默认轨道时长 (小时)
+        
+        # 存储相机和目标点信息
+        self.camera_info = camera_info
+        self.target_info = target_info
+        
+        # 如果提供了相机信息，存储相机卫星名称或地面位置
+        if camera_info:
+            if camera_info.get('type') == 'satellite':
+                self.camera_sat_name = camera_info.get('name')
+                self.camera_ground_pos = None
+            else:
+                self.camera_sat_name = None
+                self.camera_ground_pos = camera_info.get('gcrs_coords')
+                
+        # 如果提供了目标信息，存储目标卫星名称或地面位置
+        if target_info:
+            if target_info.get('type') == 'satellite':
+                self.target_sat_name = target_info.get('name')
+                self.target_ground_pos = None
+            else:
+                self.target_sat_name = None
+                self.target_ground_pos = target_info.get('gcrs_coords')
         
         print(f"正在准备可视化 {len(self.selected_satellites)} 个选定的卫星...")
     
@@ -250,7 +276,7 @@ class SolarSystemVisualizer:
             #    # 写入所有行
             #    writer.writerows(debug_rows)
             
-            print(f"[DEBUG] 已将卫星 {satellite_name} 的轨道点写入 {csv_filename}")
+            #print(f"[DEBUG] 已将卫星 {satellite_name} 的轨道点写入 {csv_filename}")
             
             return positions, orbit_info
         except Exception as e:
@@ -335,6 +361,17 @@ class SolarSystemVisualizer:
                     initial_sat_x, initial_sat_y, initial_sat_z = sat_position
                     sat_x, sat_y, sat_z = initial_sat_x, initial_sat_y, initial_sat_z
                     
+                    # 检查该卫星是否是相机点或观察点
+                    is_camera = hasattr(self, 'camera_sat_name') and self.camera_sat_name == sat_name
+                    is_target = hasattr(self, 'target_sat_name') and self.target_sat_name == sat_name
+                    
+                    # 添加标签前缀
+                    display_name = sat_name
+                    if is_camera:
+                        display_name = f"[相机载荷] {sat_name}"
+                    elif is_target:
+                        display_name = f"[被观察点] {sat_name}"
+                    
                     # 先计算过去的轨道点
                     if sat_name in self.satellite_tle_data:
                         past_positions, orbit_info = self._calculate_past_orbit(
@@ -352,7 +389,7 @@ class SolarSystemVisualizer:
                             sat_x, sat_y, sat_z = past_positions[-1]
                             
                             # 轨道显示名称
-                            orbit_display_name = f'{sat_name} - {orbit_info}'
+                            orbit_display_name = f'{display_name} - {orbit_info}'
                             
                             # 绘制轨道线
                             fig.add_trace(
@@ -375,19 +412,33 @@ class SolarSystemVisualizer:
                             print(f"  计算坐标: [{sat_x:.1f}, {sat_y:.1f}, {sat_z:.1f}]")
                     
                     # 之后再绘制卫星标记，使用更新后的坐标
+                    marker_color = self._get_satellite_color(sat_name)
+                    marker_size = 5
+                    marker_symbol = 'diamond'
+                    
+                    # 为相机点和观察点使用特殊标记
+                    if is_camera:
+                        marker_size = 8
+                        marker_symbol = 'circle'
+                        marker_color = 'rgb(255, 0, 0)'  # 红色
+                    elif is_target:
+                        marker_size = 8
+                        marker_symbol = 'circle-open'
+                        marker_color = 'rgb(0, 255, 0)'  # 绿色
+                    
                     fig.add_trace(
                         go.Scatter3d(
                             x=[sat_x], y=[sat_y], z=[sat_z],
                             mode='markers+text',
-                            text=[sat_name],
+                            text=[display_name],
                             textposition='top center',
                             marker=dict(
-                                size=5,
-                                color=self._get_satellite_color(sat_name),
-                                symbol='diamond',
+                                size=marker_size,
+                                color=marker_color,
+                                symbol=marker_symbol,
                                 line=dict(color='rgba(0, 0, 0, 0.5)', width=1)
                             ),
-                            name=f"{sat_name} ({model_name})"
+                            name=f"{display_name} ({model_name})"
                         )
                     )
                     
@@ -395,6 +446,45 @@ class SolarSystemVisualizer:
                     
                 except Exception as e:
                     print(f"绘制卫星 {sat_name} 失败: {e}")
+            
+            # 绘制地面站或手动GCRS坐标点（如果存在）
+            if hasattr(self, 'camera_ground_pos') and self.camera_ground_pos is not None:
+                x, y, z = self.camera_ground_pos
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[x], y=[y], z=[z],
+                        mode='markers+text',
+                        text=["[相机载荷] 地面站"],
+                        textposition='top center',
+                        marker=dict(
+                            size=8,
+                            color='rgb(255, 0, 0)',  # 红色
+                            symbol='circle',
+                            line=dict(color='rgba(0, 0, 0, 0.5)', width=1)
+                        ),
+                        name="[相机载荷] 地面站"
+                    )
+                )
+                print("已绘制相机地面站位置")
+                
+            if hasattr(self, 'target_ground_pos') and self.target_ground_pos is not None:
+                x, y, z = self.target_ground_pos
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[x], y=[y], z=[z],
+                        mode='markers+text',
+                        text=["[被观察点] 地面站"],
+                        textposition='top center',
+                        marker=dict(
+                            size=8,
+                            color='rgb(0, 255, 0)',  # 绿色
+                            symbol='circle-open',
+                            line=dict(color='rgba(0, 0, 0, 0.5)', width=1)
+                        ),
+                        name="[被观察点] 地面站"
+                    )
+                )
+                print("已绘制目标地面站位置")
             
             print("设置图表布局...")
             # 设置图表布局
@@ -507,7 +597,13 @@ def visualize_in_new_thread(selection_result, time_utc, satellite_positions, tle
     
     def run_visualization():
         try:
+            # 等待一段时间，确保主线程的tkinter资源已完全清理
+            time.sleep(1.0)
+            
             print("开始生成卫星轨道可视化...")
+            
+            # 在新线程中强制执行垃圾回收，确保不会复用主线程的tkinter实例
+            gc.collect()
             
             # 准备选定的卫星数据，包含模型名、卫星名、模型UUID和卫星位置
             selected_satellites = []
@@ -524,13 +620,37 @@ def visualize_in_new_thread(selection_result, time_utc, satellite_positions, tle
                 visualization_done.set()
                 return
                 
+            # 从selection_result中提取相机和目标信息
+            camera_info = None
+            target_info = None
+            
+            # 如果存在camera键，提取相机信息
+            if 'camera' in selection_result:
+                camera = selection_result['camera']
+                camera_info = {
+                    'type': camera.get('type', 'unknown'),
+                    'name': camera.get('name', '未知相机'),
+                    'gcrs_coords': camera.get('gcrs_coords')
+                }
+                
+            # 如果存在target键，提取目标信息
+            if 'target' in selection_result:
+                target = selection_result['target']
+                target_info = {
+                    'type': target.get('type', 'unknown'),
+                    'name': target.get('name', '未知目标'),
+                    'gcrs_coords': target.get('gcrs_coords')
+                }
+                
             # 创建可视化器对象，传入选定的卫星、时间和TLE数据
             visualizer = SolarSystemVisualizer(
                 selected_satellites,
                 time_utc,
                 tle_data,
                 ts,
-                earth  # 传递地球对象
+                earth,  # 传递地球对象
+                camera_info=camera_info,
+                target_info=target_info
             )
             
             # 生成并保存可视化

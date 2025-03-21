@@ -270,7 +270,7 @@ def set_attrubute_the_earth(pos, rot_angle=None, rot_axis=None, radius=None):
     if prerequisite_checker() is False:
         return []
     if radius is None:
-        radius = 6378.0 # km
+        radius = 6340.0 # km
     if rot_angle is None and rot_axis is None:
         rot_angle = 23.5
         rot_axis = [1, 0, 0] # X-axis
