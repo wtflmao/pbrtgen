@@ -91,7 +91,7 @@ def parse_tle_file(filepath):
     tle_data = {}
     
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         
         # 每3行为一组TLE数据

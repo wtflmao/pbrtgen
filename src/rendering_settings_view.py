@@ -23,7 +23,7 @@ class RenderingSettingsView:
             self.root = tk.Toplevel(root)
             
         self.root.title("渲染设置")
-        self.root.geometry("500x400")
+        self.root.geometry("600x600")  # 增加窗口高度和宽度
         self.root.resizable(False, False)
         
         # 使窗口显示在前台
@@ -51,7 +51,7 @@ class RenderingSettingsView:
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # 顶部标题
-        title_label = ttk.Label(main_frame, text="渲染设置", font=("Arial", 16))
+        title_label = ttk.Label(main_frame, text="渲染设置", font=("Arial", 16, "bold"))
         title_label.pack(pady=(0, 20))
         
         # 设置框架
@@ -69,11 +69,11 @@ class RenderingSettingsView:
             to=170.0, 
             variable=self.fov, 
             orient=tk.HORIZONTAL,
-            length=200
+            length=300
         )
         fov_scale.pack(side=tk.LEFT, padx=(0, 10))
         
-        fov_entry = ttk.Entry(fov_frame, textvariable=self.fov, width=6)
+        fov_entry = ttk.Entry(fov_frame, textvariable=self.fov, width=8)
         fov_entry.pack(side=tk.LEFT)
         ttk.Label(fov_frame, text="度").pack(side=tk.LEFT)
         
@@ -81,77 +81,92 @@ class RenderingSettingsView:
         resolution_frame = ttk.LabelFrame(settings_frame, text="渲染分辨率")
         resolution_frame.pack(fill=tk.X, pady=10)
         
+        resolution_inner_frame = ttk.Frame(resolution_frame)
+        resolution_inner_frame.pack(padx=10, pady=10)
+        
         # X分辨率
-        ttk.Label(resolution_frame, text="宽度:").grid(row=0, column=0, padx=5, pady=5)
-        resolution_x_entry = ttk.Entry(resolution_frame, textvariable=self.resolution_x, width=8)
+        ttk.Label(resolution_inner_frame, text="宽度:").grid(row=0, column=0, padx=5, pady=5)
+        resolution_x_entry = ttk.Entry(resolution_inner_frame, textvariable=self.resolution_x, width=10)
         resolution_x_entry.grid(row=0, column=1, padx=5, pady=5)
-        ttk.Label(resolution_frame, text="像素").grid(row=0, column=2, padx=5, pady=5)
+        ttk.Label(resolution_inner_frame, text="像素").grid(row=0, column=2, padx=5, pady=5)
         
         # Y分辨率
-        ttk.Label(resolution_frame, text="高度:").grid(row=0, column=3, padx=5, pady=5)
-        resolution_y_entry = ttk.Entry(resolution_frame, textvariable=self.resolution_y, width=8)
+        ttk.Label(resolution_inner_frame, text="高度:").grid(row=0, column=3, padx=5, pady=5)
+        resolution_y_entry = ttk.Entry(resolution_inner_frame, textvariable=self.resolution_y, width=10)
         resolution_y_entry.grid(row=0, column=4, padx=5, pady=5)
-        ttk.Label(resolution_frame, text="像素").grid(row=0, column=5, padx=5, pady=5)
+        ttk.Label(resolution_inner_frame, text="像素").grid(row=0, column=5, padx=5, pady=5)
         
         # 常用分辨率快速选择
         resolution_buttons_frame = ttk.Frame(resolution_frame)
-        resolution_buttons_frame.grid(row=1, column=0, columnspan=6, pady=5)
+        resolution_buttons_frame.pack(pady=5)
         
-        ttk.Button(resolution_buttons_frame, text="SD (640x480)", 
-                 command=lambda: self.set_resolution(1366, 768)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(resolution_buttons_frame, text="HD (1366x768)", 
-                 command=lambda: self.set_resolution(1366, 768)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(resolution_buttons_frame, text="FHD (1920x1080)", 
-                 command=lambda: self.set_resolution(1920, 1080)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(resolution_buttons_frame, text="4K (3840x2160)", 
-                 command=lambda: self.set_resolution(3840, 2160)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(resolution_buttons_frame, text="1:1 (800x800)", 
-                 command=lambda: self.set_resolution(800, 800)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(resolution_buttons_frame, text="1:1 (1600*1600)", 
-                 command=lambda: self.set_resolution(1600, 1600)).pack(side=tk.LEFT, padx=5)
+        resolutions = [
+            ("16:9 (640x480)", 640, 480),
+            ("16:9 (1366x768)", 1366, 768),
+            ("16:9 (1920x1080)", 1920, 1080),
+            ("16:9 (3840x2160)", 3840, 2160),
+            ("1:1 (800x800)", 800, 800),
+            ("1:1 (1600x1600)", 1600, 1600),
+            ("1:1 (3200x3200)", 3200, 3200),
+            ("1:1 (6400x6400)", 6400, 6400)
+        ]
+        
+        for i, (label, x, y) in enumerate(resolutions):
+            row = i // 4
+            col = i % 4
+            ttk.Button(resolution_buttons_frame, text=label, 
+                       command=lambda x=x, y=y: self.set_resolution(x, y)
+                       ).grid(row=row, column=col, padx=5, pady=5)
         
         # 采样设置
         sampling_frame = ttk.LabelFrame(settings_frame, text="采样设置")
         sampling_frame.pack(fill=tk.X, pady=10)
         
+        sampling_inner_frame = ttk.Frame(sampling_frame)
+        sampling_inner_frame.pack(padx=10, pady=10)
+        
         # 像素采样次数
-        ttk.Label(sampling_frame, text="像素采样次数:").grid(row=0, column=0, padx=5, pady=5)
+        ttk.Label(sampling_inner_frame, text="像素采样次数:").grid(row=0, column=0, padx=5, pady=5)
         pixel_samples_spinbox = ttk.Spinbox(
-            sampling_frame, 
-            from_=4, 
-            to=2048, 
+            sampling_inner_frame, 
+            from_=1, 
+            to=1024, 
             textvariable=self.pixel_samples,
-            width=8,
+            width=10,
             increment=4
         )
         pixel_samples_spinbox.grid(row=0, column=1, padx=5, pady=5)
         
         # 快速预设按钮
-        ttk.Button(sampling_frame, text="低 (16)", 
+        ttk.Button(sampling_inner_frame, text="低 (16)", 
                  command=lambda: self.pixel_samples.set(16)).grid(row=0, column=2, padx=5, pady=5)
-        ttk.Button(sampling_frame, text="中 (64)", 
+        ttk.Button(sampling_inner_frame, text="中 (64)", 
                  command=lambda: self.pixel_samples.set(64)).grid(row=0, column=3, padx=5, pady=5)
-        ttk.Button(sampling_frame, text="高 (256)", 
-                 command=lambda: self.pixel_samples.set(256)).grid(row=0, column=4, padx=5, pady=5)
+        ttk.Button(sampling_inner_frame, text="高 (128)", 
+                 command=lambda: self.pixel_samples.set(128)).grid(row=0, column=4, padx=5, pady=5)
+        ttk.Button(sampling_inner_frame, text="极高 (512)", 
+                 command=lambda: self.pixel_samples.set(512)).grid(row=0, column=5, padx=5, pady=5)
         
         # 最大反射次数
-        ttk.Label(sampling_frame, text="最大反射次数:").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Label(sampling_inner_frame, text="最大反射次数:").grid(row=1, column=0, padx=5, pady=5)
         max_depth_spinbox = ttk.Spinbox(
-            sampling_frame, 
+            sampling_inner_frame, 
             from_=1, 
-            to=20, 
+            to=100, 
             textvariable=self.max_depth,
-            width=8
+            width=10
         )
         max_depth_spinbox.grid(row=1, column=1, padx=5, pady=5)
         
         # 预设按钮
-        ttk.Button(sampling_frame, text="低 (3)", 
+        ttk.Button(sampling_inner_frame, text="低 (3)", 
                  command=lambda: self.max_depth.set(3)).grid(row=1, column=2, padx=5, pady=5)
-        ttk.Button(sampling_frame, text="中 (5)", 
+        ttk.Button(sampling_inner_frame, text="中 (5)", 
                  command=lambda: self.max_depth.set(5)).grid(row=1, column=3, padx=5, pady=5)
-        ttk.Button(sampling_frame, text="高 (16)", 
+        ttk.Button(sampling_inner_frame, text="高 (16)", 
                  command=lambda: self.max_depth.set(16)).grid(row=1, column=4, padx=5, pady=5)
+        ttk.Button(sampling_inner_frame, text="极高 (40)", 
+                 command=lambda: self.max_depth.set(40)).grid(row=1, column=5, padx=5, pady=5)
         
         # 性能提示
         warning_label = ttk.Label(
@@ -169,9 +184,12 @@ class RenderingSettingsView:
         cancel_button = ttk.Button(button_frame, text="取消", command=self.cancel)
         cancel_button.pack(side=tk.RIGHT, padx=5)
         
-        # 确认按钮
-        confirm_button = ttk.Button(button_frame, text="确认", command=self.confirm)
-        confirm_button.pack(side=tk.RIGHT, padx=5)
+        # 下一步按钮
+        next_button = ttk.Button(button_frame, text="下一步", command=self.confirm)
+        next_button.pack(side=tk.RIGHT, padx=5)
+        
+        # 确保下一步按钮为默认按钮
+        next_button.bind('<Return>', lambda event: self.confirm())
     
     def set_resolution(self, x, y):
         """设置分辨率
@@ -200,24 +218,24 @@ class RenderingSettingsView:
             max_depth = int(self.max_depth.get())
             
             # 验证值范围
-            if fov < 20.0 or fov > 120.0:
-                messagebox.showerror("输入错误", "视场角应在20到120度之间")
+            if fov < 0.01 or fov > 170.0:
+                messagebox.showerror("输入错误", "视场角应在0.01到170.0度之间")
                 return
             
-            if resolution_x < 100 or resolution_x > 10000:
-                messagebox.showerror("输入错误", "宽度分辨率应在100到10000之间")
+            if resolution_x < 1 or resolution_x > 10000:
+                messagebox.showerror("输入错误", "宽度分辨率应在1到10000之间")
                 return
                 
-            if resolution_y < 100 or resolution_y > 10000:
-                messagebox.showerror("输入错误", "高度分辨率应在100到10000之间")
+            if resolution_y < 1 or resolution_y > 10000:
+                messagebox.showerror("输入错误", "高度分辨率应在1到10000之间")
                 return
             
-            if pixel_samples < 4 or pixel_samples > 2048:
-                messagebox.showerror("输入错误", "像素采样次数应在4到2048之间")
+            if pixel_samples < 1 or pixel_samples > 1024:
+                messagebox.showerror("输入错误", "像素采样次数应在1到1024之间")
                 return
                 
-            if max_depth < 1 or max_depth > 20:
-                messagebox.showerror("输入错误", "最大反射次数应在1到20之间")
+            if max_depth < 1 or max_depth > 100:
+                messagebox.showerror("输入错误", "最大反射次数应在1到100之间")
                 return
             
             # 保存结果

@@ -200,7 +200,7 @@ def set_bkg_light_source(filename=None, scale=1.0):
         list: 包含背景光源设置行的列表。
     """
     if filename is None:
-        filename = 'milkyway_2020_8k_equalarea.exr'
+        filename = 'hiptyc_2020_8k_equalarea.exr'
     if prerequisite_checker() is False:
         return []
     global ws_items
@@ -241,12 +241,13 @@ def set_attrubute_the_sun(pos, radius=None):
     
     return [f'# The sun (emitter part)',
             f'AttributeBegin',
-            f'  CoordSysTransform "camera"',
-            f'  LightSource "distant"', #  使用内置 "distant" 远距平行光
-            f'              "point3 from" [0 0 0]',
-            f'              "point3 to" [{x} {y} {z}]',
-            f'              "spectrum L" "sun.spd"',
-            f'              "float scale" [1.0]',
+            #f'  CoordSysTransform "camera"',
+            #f'  LightSource "distant"', #  使用内置 "distant" 远距平行光
+            #f'              "point3 from" [0 0 0]',
+            #f'              "point3 to" [{x} {y} {z}]',
+            #f'              "spectrum L" "sun.spd"',
+            #f'              "float scale" [1.0]',
+            f'  LightSource "infinite" "string filename" "sky.exr" "float scale" 8',
             f'AttributeEnd',
             f'',
             f'# The sun (geometry part)',

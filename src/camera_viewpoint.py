@@ -427,8 +427,35 @@ class CameraViewpointSelector:
         if selected_text.startswith("--"):
             return
         
+        # 处理地面站选择 - 使用映射获取原始站点名称
+        if hasattr(self, 'station_display_map') and selected_text in self.station_display_map:
+            station_name = self.station_display_map[selected_text]
+            station_data = self.ground_stations[station_name]
+            self.target_lat_var.set(str(station_data["lat"]))
+            self.target_lon_var.set(str(station_data["lon"]))
+            
+            # 计算GCRS坐标
+            gcrs_coords = self.geo_to_gcrs(station_data["lat"], station_data["lon"], station_data["alt"])
+            self.target_x_var.set(f"{gcrs_coords[0]:.2f}")
+            self.target_y_var.set(f"{gcrs_coords[1]:.2f}")
+            self.target_z_var.set(f"{gcrs_coords[2]:.2f}")
+            
+            # 保存选择
+            self.target_source = {
+                "type": "ground_station",
+                "name": station_name,
+                "display_name": selected_text,
+                "lat": station_data["lat"],
+                "lon": station_data["lon"],
+                "alt": station_data["alt"],
+                "gcrs_coords": gcrs_coords
+            }
+            
+            # 启用确认按钮
+            self.target_confirm_button.config(state="normal")
+        
         # 处理卫星选择
-        if selected_text in self.satellite_data:
+        elif selected_text in self.satellite_data:
             sat_coords = self.satellite_data[selected_text]
             self.target_x_var.set(f"{sat_coords[0]:.2f}")
             self.target_y_var.set(f"{sat_coords[1]:.2f}")
@@ -704,8 +731,8 @@ class CameraViewpointSelector:
                          (cam_coords[1] - target_coords[1])**2 + 
                          (cam_coords[2] - target_coords[2])**2)
         
-        # 如果距离小于4千米，认为是同一位置
-        return dist < 4.0
+        # 如果距离小于0.5千米，认为是同一位置
+        return dist < 0.5
     
     def check_earth_occlusion(self, point1, point2):
         """检查两点之间是否被地球遮挡

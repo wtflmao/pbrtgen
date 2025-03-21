@@ -145,7 +145,7 @@ latest_tle_data = load_tle_data(latest_tle_data)
 
 # 从settings.yaml读取API信息
 def load_api_settings():
-    with open('settings.yaml', 'r') as file:
+    with open('settings.yaml', 'r', encoding='utf-8') as file:
         settings = yaml.safe_load(file)
     api_base_url = settings['api']['API_BASE_URL']
     api_version = settings['api']['API_VERSION']
@@ -703,7 +703,7 @@ def transform_and_create_scene_files(selection_result, api_base_url, api_version
         print(f"最大反射次数: {max_depth}")
     
     # 基于用户选择的时间更新世界设置
-    w_settings = [set_bkg_light_source(None, 0.5),
+    w_settings = [set_bkg_light_source(None, 0.0001),
                  set_attrubute_the_sun([sun_gcrs_km.x.value, sun_gcrs_km.y.value, sun_gcrs_km.z.value], None),
                  set_attrubute_the_moon([moon_gcrs_km.x.value, moon_gcrs_km.y.value, moon_gcrs_km.z.value], None),
                  set_attrubute_the_earth([earth_gcrs_km.x.value, earth_gcrs_km.y.value, earth_gcrs_km.z.value], None, None, None)]
@@ -723,7 +723,7 @@ def transform_and_create_scene_files(selection_result, api_base_url, api_version
         r_settings_overwriter('rendering_settings.pbrt', r_settings)
     else:
         # 读取现有设置文件并更新相关部分
-        with open('rendering_settings.pbrt', 'r') as f:
+        with open('rendering_settings.pbrt', 'r', encoding='utf-8') as f:
             content = f.read()
         
         # 查找并替换相机设置
@@ -767,7 +767,7 @@ def transform_and_create_scene_files(selection_result, api_base_url, api_version
                 i += 1
         
         # 重写文件
-        with open('rendering_settings.pbrt', 'w') as f:
+        with open('rendering_settings.pbrt', 'w', encoding='utf-8') as f:
             f.write('\n'.join(new_lines))
         
         print("已更新渲染设置文件")
@@ -795,7 +795,7 @@ def transform_and_create_scene_files(selection_result, api_base_url, api_version
     w_settings_appender(output_file_path, w_settings)
     
     # 添加模型标记
-    with open(output_file_path, 'a') as f:
+    with open(output_file_path, 'a', encoding='utf-8') as f:
         f.write("\n# 模型部分开始\n\n")
     
     # 处理每个模型-TLE配对
@@ -973,7 +973,7 @@ def post_process_pbrt_file(output_file_path):
         output_file_path: PBRT文件路径
     """
     try:
-        with open(output_file_path, 'r') as f:
+        with open(output_file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
         # 替换 AttributeEndAttributeBegin 为 AttributeEnd\nAttributeBegin
@@ -981,7 +981,7 @@ def post_process_pbrt_file(output_file_path):
         
         # 如果内容发生变化，则重新写入文件
         if modified_content != content:
-            with open(output_file_path, 'w') as f:
+            with open(output_file_path, 'w', encoding='utf-8') as f:
                 f.write(modified_content)
             print(f"已处理文件 {output_file_path}，添加了换行")
         else:
