@@ -39,6 +39,7 @@ moon = get_celestial_object(eph, 'moon')
 
 # 2. 定义时间 (2025年3月10日 UTC+8 08:00)
 ts = get_timescale() # 获取 skyfield 的 timescale
+"""
 time_utc = get_utc_time(ts, 2025, 3, 10, 8, 0, 0) # 使用 skyfield 的 timescale 创建 Time 对象
 
 # 3. 定义 Starlink 卫星的 TLE 数据 
@@ -117,7 +118,7 @@ print(f"Sun (GCRS, km): X={sun_gcrs_km.x:.6f}, Y={sun_gcrs_km.y:.6f}, Z={sun_gcr
 print(f"Moon (GCRS, km): X={moon_gcrs_km.x:.6f}, Y={moon_gcrs_km.y:.6f}, Z={moon_gcrs_km.z:.6f}")
 print(f"Starlink-1008 (GCRS, km): X={satellite_1008_gcrs_km.x:.6f}, Y={satellite_1008_gcrs_km.y:.6f}, Z={satellite_1008_gcrs_km.z:.6f}")
 print(f"Starlink-32899 (GCRS, km): X={satellite_32899_gcrs_km.x:.6f}, Y={satellite_32899_gcrs_km.y:.6f}, Z={satellite_32899_gcrs_km.z:.6f}")
-
+"""
 # 10. 构建 .pbrt 文件的渲染设置与公共场景设置
 
 r_settings = [['# PBRTgen 0.0.1', '# by github.com/wtflmao', '\n'],
@@ -580,6 +581,8 @@ def process_material_names(content, model_uuid):
     )
     
     return content
+
+time_utc = get_utc_time(ts, 2025, 3, 10, 8, 0, 0) # mock
 
 # 处理模型变换、下载并生成场景文件
 def transform_and_create_scene_files(selection_result, api_base_url, api_version, api_key):
